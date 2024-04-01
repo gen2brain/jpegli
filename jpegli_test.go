@@ -22,6 +22,9 @@ var testPng []byte
 //go:embed testdata/gray.jpg
 var testGray []byte
 
+//go:embed testdata/rgba.jpg
+var testRgba []byte
+
 //go:embed testdata/cmyk.jpg
 var testCmyk []byte
 
@@ -39,6 +42,18 @@ func TestDecode(t *testing.T) {
 
 func TestGray(t *testing.T) {
 	img, err := jpegli.Decode(bytes.NewReader(testGray))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = jpegli.Encode(io.Discard, img)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestRGBA(t *testing.T) {
+	img, err := jpegli.Decode(bytes.NewReader(testRgba))
 	if err != nil {
 		t.Fatal(err)
 	}
