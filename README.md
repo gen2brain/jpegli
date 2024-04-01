@@ -4,7 +4,7 @@
 
 Go encoder/decoder for [JPEG](https://en.wikipedia.org/wiki/JPEG).
 
-Based on [jpegli](https://github.com/libjxl/libjxl/blob/main/lib/jpegli/README.md) compiled to [WASM](https://en.wikipedia.org/wiki/WebAssembly) and used with [wazero](https://wazero.io/) runtime (CGo-free).
+Based on [jpegli](https://github.com/libjxl/libjxl/blob/main/lib/jpegli/README.md) from libjxl compiled to [WASM](https://en.wikipedia.org/wiki/WebAssembly) and used with [wazero](https://wazero.io/) runtime (CGo-free).
 
 ### Benchmark
 
