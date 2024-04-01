@@ -1,7 +1,6 @@
 // Package jpegli implements an JPEG image encoder/decoder based on jpegli compiled to WASM.
 package jpegli
 
-import "C"
 import (
 	"errors"
 	"image"
