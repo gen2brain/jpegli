@@ -26,6 +26,10 @@ typedef enum {
     YCbCr410
 } chroma;
 
+void error_exit(j_common_ptr info) {
+  (*info->err->output_message)(info);
+}
+
 int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width, uint32_t *height, uint32_t *colorspace, uint32_t *chroma, uint8_t *out,
         int fancy_upsampling, int block_smoothing, int arith_code, int dct_method, int tw, int th) {
 
@@ -33,6 +37,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
 
     struct jpeg_error_mgr jerr;
     dinfo.err = jpegli_std_error(&jerr);
+    dinfo.err->error_exit = error_exit;
 
     jpegli_create_decompress(&dinfo);
     jpegli_mem_src(&dinfo, jpeg_in, jpeg_in_size);
@@ -233,6 +238,7 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
 
     struct jpeg_error_mgr jerr;
     cinfo.err = jpegli_std_error(&jerr);
+    cinfo.err->error_exit = error_exit;
 
     jpegli_create_compress(&cinfo);
 

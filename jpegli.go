@@ -34,6 +34,10 @@ const (
 	DCTFloat
 )
 
+const (
+	alignSize = 16
+)
+
 // EncodingOptions are the encoding parameters.
 type EncodingOptions struct {
 	// Quality in the range [0,100]. Default is 75.
@@ -198,7 +202,16 @@ func yCbCrSize(r image.Rectangle, subsampleRatio image.YCbCrSubsampleRatio) (w, 
 		ch = h
 	}
 
+	w = pad(w, alignSize) + alignSize
+	h = pad(h, alignSize) + alignSize
+	cw = pad(cw, alignSize) + alignSize
+	ch = pad(ch, alignSize) + alignSize
+
 	return
+}
+
+func pad(a int, b int) int {
+	return (a + (b - 1)) & (^(b - 1))
 }
 
 func init() {

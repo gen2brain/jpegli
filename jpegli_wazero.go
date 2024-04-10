@@ -39,7 +39,7 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	var data []byte
 
 	if configOnly {
-		data = make([]byte, 512)
+		data = make([]byte, 1024)
 		_, err = r.Read(data)
 		if err != nil {
 			return nil, cfg, fmt.Errorf("read: %w", err)
