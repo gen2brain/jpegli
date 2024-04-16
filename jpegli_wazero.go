@@ -10,8 +10,8 @@ import (
 	"image/color"
 	"io"
 	"os"
-	"slices"
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -252,7 +252,13 @@ func encode(w io.Writer, m image.Image, quality, chromaSubsampling, progressiveL
 		data = img.Pix
 		colorspace = jcsCMYK
 	case *image.YCbCr:
-		data = slices.Concat(img.Y, img.Cb, img.Cr)
+		length := len(img.Y) + len(img.Cb) + len(img.Cr)
+		var b = struct {
+			addr *uint8
+			len  int
+			cap  int
+		}{&img.Y[0], length, length}
+		data = *(*[]byte)(unsafe.Pointer(&b))
 		colorspace = jcsYCbCr
 		chroma = int(img.SubsampleRatio)
 	default:
