@@ -202,16 +202,11 @@ func yCbCrSize(r image.Rectangle, subsampleRatio image.YCbCrSubsampleRatio) (w, 
 		ch = h
 	}
 
-	w = pad(w, alignSize) + alignSize
-	h = pad(h, alignSize) + alignSize
-	cw = pad(cw, alignSize) + alignSize
-	ch = pad(ch, alignSize) + alignSize
-
 	return
 }
 
-func pad(a int, b int) int {
-	return (a + (b - 1)) & (^(b - 1))
+func alignm(a int) int {
+	return (a + (alignSize - 1)) & (^(alignSize - 1))
 }
 
 func init() {

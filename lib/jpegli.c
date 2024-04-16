@@ -5,6 +5,9 @@
 #include "jpegli/decode.h"
 #include "jpegli/encode.h"
 
+#define ALIGN_SIZE 16
+#define ALIGNM(x)  ((((x) + ((ALIGN_SIZE) - 1)) / (ALIGN_SIZE)) * (ALIGN_SIZE))
+
 int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width, uint32_t *height, uint32_t *colorspace, uint32_t *chroma, uint8_t *out,
         int fancy_upsampling, int block_smoothing, int arith_code, int dct_method, int tw, int th);
 
@@ -75,7 +78,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
 
     int cDiv = 1;
     int subsampleRatio = -1;
-    int yw, yh, cw, ch;
+    int w, h, cw, ch;
 
     switch(dinfo.jpeg_color_space) {
         case JCS_GRAYSCALE:
@@ -92,21 +95,41 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
 
             dinfo.raw_data_out = 1;
 
-            yw = dinfo.comp_info[Y].downsampled_width;
-            yh = dinfo.comp_info[Y].downsampled_height;
+            w = dinfo.comp_info[Y].downsampled_width;
+            h = dinfo.comp_info[Y].downsampled_height;
             cw = dinfo.comp_info[Cb].downsampled_width;
             ch = dinfo.comp_info[Cb].downsampled_height;
 
-            if(yw == cw && yh == ch) {
+            if(w == cw && h == ch) {
                 subsampleRatio = YCbCr444;
-            } else if(yw == cw && (yh+1)/2 == ch) {
+
+                w = ALIGNM(w);
+                h = ALIGNM(h);
+                cw = w;
+                ch = h;
+            } else if(w == cw && (h+1)/2 == ch) {
                 subsampleRatio = YCbCr440;
                 cDiv = 2;
-            } else if((yw+1)/2 == cw && yh == ch) {
+
+                w = ALIGNM(w);
+                h = ALIGNM(h);
+                cw = w;
+                ch = (h+1)/2;
+            } else if((w+1)/2 == cw && h == ch) {
                 subsampleRatio = YCbCr422;
-            } else if((yw+1)/2 == cw && (yh+1)/2 == ch) {
+
+                w = ALIGNM(w);
+                h = ALIGNM(h);
+                cw = (w+1)/2;
+                ch = h;
+            } else if((w+1)/2 == cw && (h+1)/2 == ch) {
                 subsampleRatio = YCbCr420;
                 cDiv = 2;
+
+                w = ALIGNM(w);
+                h = ALIGNM(h);
+                cw = (w+1)/2;
+                ch = (h+1)/2;
             }
 
             break;
@@ -171,11 +194,11 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
         cb_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
         cr_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
 
-        y_stride = dinfo.image_width;
+        y_stride = w;
         c_stride = cw;
 
-        int i0 = dinfo.image_width * dinfo.image_height;
-        int i1 = dinfo.image_width * dinfo.image_height + 1*cw*ch;
+        int i0 = w * h + 0*cw*ch;
+        int i1 = w * h + 1*cw*ch;
 
         y_out = &out[0];
         cb_out = &out[i0];
@@ -225,9 +248,12 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
         free(cr_rows);
     }
 
-    jpegli_finish_decompress(&dinfo);
-    jpegli_destroy_decompress(&dinfo);
+    if(!jpegli_finish_decompress(&dinfo)) {
+        jpegli_destroy_decompress(&dinfo);
+        return 0;
+    }
 
+    jpegli_destroy_decompress(&dinfo);
     return 1;
 }
 
@@ -243,7 +269,7 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
     jpegli_create_compress(&cinfo);
 
     int stride, y_stride, c_stride;
-    int h, cw, ch;
+    int w, h, cw, ch;
     int y_h = 0, c_h = 0;
     int cDiv = 1;
     uint8_t* y_in;
@@ -378,14 +404,38 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
         cb_rows = malloc(sizeof(JSAMPROW) * c_h);
         cr_rows = malloc(sizeof(JSAMPROW) * c_h);
 
-        cw = cinfo.comp_info[Cb].downsampled_width;
-        ch = cinfo.comp_info[Cb].downsampled_height;
+        switch(chroma) {
+            case YCbCr444:
+                w = ALIGNM(cinfo.comp_info[Y].downsampled_width);
+                h = ALIGNM(cinfo.comp_info[Y].downsampled_height);
+                cw = w;
+                ch = h;
+                break;
+            case YCbCr440:
+                w = ALIGNM(cinfo.comp_info[Y].downsampled_width);
+                h = ALIGNM(cinfo.comp_info[Y].downsampled_height);
+                cw = w;
+                ch = (h+1)/2;
+                break;
+            case YCbCr422:
+                w = ALIGNM(cinfo.comp_info[Y].downsampled_width);
+                h = ALIGNM(cinfo.comp_info[Y].downsampled_height);
+                cw = (w+1)/2;
+                ch = h;
+                break;
+            case YCbCr420:
+                w = ALIGNM(cinfo.comp_info[Y].downsampled_width);
+                h = ALIGNM(cinfo.comp_info[Y].downsampled_height);
+                cw = (w+1)/2;
+                ch = (h+1)/2;
+                break;
+        }
 
-        y_stride = width;
+        y_stride = w;
         c_stride = cw;
 
-        int i0 = width * height;
-        int i1 = width * height + 1*cw*ch;
+        int i0 = w * h + 0*cw*ch;
+        int i1 = w * h + 1*cw*ch;
 
         y_in = &in[0];
         cb_in = &in[i0];

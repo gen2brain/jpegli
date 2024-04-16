@@ -40,31 +40,31 @@ func TestDecode(t *testing.T) {
 	}
 }
 
-func TestGray(t *testing.T) {
+func TestDecodeGray(t *testing.T) {
 	img, err := jpegli.Decode(bytes.NewReader(testGray))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = jpegli.Encode(io.Discard, img)
+	err = jpeg.Encode(io.Discard, img, nil)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-func TestRGBA(t *testing.T) {
+func TestDecodeRGBA(t *testing.T) {
 	img, err := jpegli.Decode(bytes.NewReader(testRgba))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = jpegli.Encode(io.Discard, img)
+	err = jpeg.Encode(io.Discard, img, nil)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-func TestCMYK(t *testing.T) {
+func TestDecodeCMYK(t *testing.T) {
 	img, err := jpegli.Decode(bytes.NewReader(testCmyk))
 	if err != nil {
 		t.Fatal(err)

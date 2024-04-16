@@ -142,20 +142,23 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	cfg.Width = int(width)
 	cfg.Height = int(height)
 
-	var size, w, h, cw, ch, i0, i1, i2 int
+	var w, cw int
+	var size, i0, i1, i2 int
+
 	switch colorspace {
 	case jcsGrayscale:
 		cfg.ColorModel = color.GrayModel
-		size = cfg.Width * cfg.Height * 1
+		size = alignm(cfg.Width) * alignm(cfg.Height) * 1
 	case jcsRGB:
 		cfg.ColorModel = color.RGBAModel
 		size = cfg.Width * cfg.Height * 4
 	case jcsYCbCr:
 		cfg.ColorModel = color.YCbCrModel
-		w, h, cw, ch = yCbCrSize(image.Rect(0, 0, cfg.Width, cfg.Height), image.YCbCrSubsampleRatio(chroma))
-		i0 = w*h + 0*cw*ch
-		i1 = w*h + 1*cw*ch
-		i2 = w*h + 2*cw*ch
+		w, _, cw, _ = yCbCrSize(image.Rect(0, 0, cfg.Width, cfg.Height), image.YCbCrSubsampleRatio(chroma))
+		aw, ah, acw, ach := yCbCrSize(image.Rect(0, 0, alignm(cfg.Width), alignm(cfg.Height)), image.YCbCrSubsampleRatio(chroma))
+		i0 = aw*ah + 0*acw*ach
+		i1 = aw*ah + 1*acw*ach
+		i2 = aw*ah + 2*acw*ach
 		size = i2
 	case jcsCMYK, jcsYCCK:
 		cfg.ColorModel = color.CMYKModel
