@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/gen2brain/jpegli"
@@ -34,7 +35,13 @@ func TestDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = jpeg.Encode(io.Discard, img, nil)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpeg.Encode(w, img, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -46,7 +53,13 @@ func TestDecodeGray(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = jpeg.Encode(io.Discard, img, nil)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpeg.Encode(w, img, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,7 +71,13 @@ func TestDecodeRGBA(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = jpeg.Encode(io.Discard, img, nil)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpeg.Encode(w, img, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -70,7 +89,13 @@ func TestDecodeCMYK(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = jpegli.Encode(io.Discard, img)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpegli.Encode(w, img)
 	if err != nil {
 		t.Error(err)
 	}
@@ -116,7 +141,13 @@ func TestDecodeWithOptions(t *testing.T) {
 		t.Errorf("width: got %d, want %d", img.Bounds().Dx(), scaleSize)
 	}
 
-	err = jpeg.Encode(io.Discard, img, nil)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpeg.Encode(w, img, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -128,7 +159,13 @@ func TestEncodeGray(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = jpegli.Encode(io.Discard, img)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpegli.Encode(w, img)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +177,13 @@ func TestEncodeRGBA(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = jpegli.Encode(io.Discard, img)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpegli.Encode(w, img)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +195,13 @@ func TestEncodeYCbCr(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = jpegli.Encode(io.Discard, img)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpegli.Encode(w, img)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +213,13 @@ func TestEncodeCMYK(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = jpegli.Encode(io.Discard, img)
+	w, err := writeCloser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	err = jpegli.Encode(w, img)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,4 +297,29 @@ func BenchmarkEncodeRGBA(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+type discard struct{}
+
+func (d discard) Close() error {
+	return nil
+}
+
+func (discard) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+var discardCloser io.WriteCloser = discard{}
+
+func writeCloser(s ...string) (io.WriteCloser, error) {
+	if len(s) > 0 {
+		f, err := os.Create(s[0])
+		if err != nil {
+			return nil, err
+		}
+
+		return f, nil
+	}
+
+	return discardCloser, nil
 }
