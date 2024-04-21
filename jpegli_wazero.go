@@ -10,7 +10,7 @@ import (
 	"image/color"
 	"io"
 	"os"
-	"sync/atomic"
+	"sync"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero"
@@ -30,9 +30,7 @@ const (
 )
 
 func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode bool, dctMethod DCTMethod, tw, th int) (image.Image, image.Config, error) {
-	if !initialized.Load() {
-		initialize()
-	}
+	initializeOnce()
 
 	var err error
 	var cfg image.Config
@@ -211,9 +209,7 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 func encode(w io.Writer, m image.Image, quality, chromaSubsampling, progressiveLevel int, optimizeCoding, adaptiveQuantization,
 	standardQuantTables, fancyDownsampling bool, dctMethod DCTMethod) error {
 
-	if !initialized.Load() {
-		initialize()
-	}
+	initializeOnce()
 
 	var data []byte
 	var colorspace int
@@ -328,14 +324,10 @@ var (
 	_decode api.Function
 	_encode api.Function
 
-	initialized atomic.Bool
+	initializeOnce = sync.OnceFunc(initialize)
 )
 
 func initialize() {
-	if initialized.Load() {
-		return
-	}
-
 	ctx := context.Background()
 	rt := wazero.NewRuntime(ctx)
 
@@ -367,6 +359,4 @@ func initialize() {
 	_free = mod.ExportedFunction("free")
 	_decode = mod.ExportedFunction("decode")
 	_encode = mod.ExportedFunction("encode")
-
-	initialized.Store(true)
 }
