@@ -125,7 +125,8 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
                 cw = (w+1)/2;
                 ch = h;
             } else if((w+1)/2 == cw && (h+1)/2 == ch) {
-                if(dinfo.comp_info[Cr].h_samp_factor == 1 && dinfo.comp_info[Cr].v_samp_factor == 2) {
+                if((dinfo.comp_info[Cr].h_samp_factor == 1 && dinfo.comp_info[Cr].v_samp_factor == 2) || \
+                        (dinfo.comp_info[Cr].h_samp_factor == 2 && dinfo.comp_info[Cr].v_samp_factor == 2)) {
                     dinfo.raw_data_out = 0;
                     yCbCr421 = 1;
                     break;
