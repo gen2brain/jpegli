@@ -80,6 +80,8 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
     int subsampleRatio = -1;
     int w, h, cw, ch;
 
+    int yCbCr421 = 0;
+
     switch(dinfo.jpeg_color_space) {
         case JCS_GRAYSCALE:
             if(scale) {
@@ -123,6 +125,12 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
                 cw = (w+1)/2;
                 ch = h;
             } else if((w+1)/2 == cw && (h+1)/2 == ch) {
+                if(dinfo.comp_info[Cr].h_samp_factor == 1 && dinfo.comp_info[Cr].v_samp_factor == 2) {
+                    dinfo.raw_data_out = 0;
+                    yCbCr421 = 1;
+                    break;
+                }
+
                 subsampleRatio = YCbCr420;
                 cDiv = 2;
 
@@ -147,7 +155,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
 
     *chroma = subsampleRatio;
 
-    if(scale && (dinfo.jpeg_color_space == JCS_GRAYSCALE || dinfo.jpeg_color_space == JCS_YCbCr)) {
+    if((scale && (dinfo.jpeg_color_space == JCS_GRAYSCALE || dinfo.jpeg_color_space == JCS_YCbCr)) || yCbCr421) {
         dinfo.out_color_space = JCS_EXT_RGBA;
         *colorspace = JCS_RGB;
     }
@@ -184,9 +192,9 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
     mcu_rows = DCTSIZE * dinfo.max_v_samp_factor;
     stride = dinfo.output_width * dinfo.out_color_components;
     
-    if(dinfo.jpeg_color_space == JCS_GRAYSCALE) {
+    if(dinfo.jpeg_color_space == JCS_GRAYSCALE && !scale && !yCbCr421) {
         rows = malloc(sizeof(JSAMPROW) * mcu_rows);
-    } else if(dinfo.jpeg_color_space == JCS_YCbCr) {
+    } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !yCbCr421) {
         y_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
         cb_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
         cr_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
@@ -209,7 +217,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
             }
 
             jpegli_read_raw_data(&dinfo, &rows, mcu_rows);
-        } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale) {
+        } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !yCbCr421) {
             for(int i = 0; i < mcu_rows; i++) {
                 y_rows[i] = &y_out[(dinfo.output_scanline * y_stride) + (y_stride * i)];
                 cb_rows[i] = &cb_out[((dinfo.output_scanline * c_stride) / cDiv) + (c_stride * i)];
@@ -225,9 +233,9 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
         }
     }
 
-    if(dinfo.jpeg_color_space == JCS_GRAYSCALE) {
+    if(dinfo.jpeg_color_space == JCS_GRAYSCALE && !scale && !yCbCr421) {
         free(rows);
-    } else if(dinfo.jpeg_color_space == JCS_YCbCr) {
+    } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !yCbCr421) {
         free(y_rows);
         free(cb_rows);
         free(cr_rows);
