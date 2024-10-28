@@ -45,6 +45,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
     jpegli_create_decompress(&dinfo);
     jpegli_mem_src(&dinfo, jpeg_in, jpeg_in_size);
 
+    jpegli_save_markers(&dinfo, JPEG_APP0+13, 0xffff);
     if(jpegli_read_header(&dinfo, 1) != JPEG_HEADER_OK) {
         jpegli_destroy_decompress(&dinfo);
         return 0;
@@ -80,7 +81,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
     int subsampleRatio = -1;
     int w, h, cw, ch;
 
-    int yCbCr421 = 0;
+    int forceRGBA = 0;
 
     switch(dinfo.jpeg_color_space) {
         case JCS_GRAYSCALE:
@@ -93,6 +94,17 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
         case JCS_YCbCr:
             if(scale) {
                 break;
+            }
+
+            jpeg_saved_marker_ptr marker = dinfo.marker_list;
+            while(marker) {
+	            if(marker->marker == JPEG_APP0+13) {
+                    if(marker->data_length > 0) {
+                        forceRGBA = 1;
+                        break;
+                    }
+	            }
+	            marker = marker->next;
             }
 
             dinfo.raw_data_out = 1;
@@ -128,7 +140,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
                 if((dinfo.comp_info[Cr].h_samp_factor == 1 && dinfo.comp_info[Cr].v_samp_factor == 2) || \
                         (dinfo.comp_info[Cr].h_samp_factor == 2 && dinfo.comp_info[Cr].v_samp_factor == 2)) {
                     dinfo.raw_data_out = 0;
-                    yCbCr421 = 1;
+                    forceRGBA = 1;
                     break;
                 }
 
@@ -156,7 +168,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
 
     *chroma = subsampleRatio;
 
-    if((scale && (dinfo.jpeg_color_space == JCS_GRAYSCALE || dinfo.jpeg_color_space == JCS_YCbCr)) || yCbCr421) {
+    if((scale && (dinfo.jpeg_color_space == JCS_GRAYSCALE || dinfo.jpeg_color_space == JCS_YCbCr)) || forceRGBA) {
         dinfo.out_color_space = JCS_EXT_RGBA;
         *colorspace = JCS_RGB;
     }
@@ -193,9 +205,9 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
     mcu_rows = DCTSIZE * dinfo.max_v_samp_factor;
     stride = dinfo.output_width * dinfo.out_color_components;
     
-    if(dinfo.jpeg_color_space == JCS_GRAYSCALE && !scale && !yCbCr421) {
+    if(dinfo.jpeg_color_space == JCS_GRAYSCALE && !scale && !forceRGBA) {
         rows = malloc(sizeof(JSAMPROW) * mcu_rows);
-    } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !yCbCr421) {
+    } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !forceRGBA) {
         y_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
         cb_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
         cr_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
@@ -218,7 +230,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
             }
 
             jpegli_read_raw_data(&dinfo, &rows, mcu_rows);
-        } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !yCbCr421) {
+        } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !forceRGBA) {
             for(int i = 0; i < mcu_rows; i++) {
                 y_rows[i] = &y_out[(dinfo.output_scanline * y_stride) + (y_stride * i)];
                 cb_rows[i] = &cb_out[((dinfo.output_scanline * c_stride) / cDiv) + (c_stride * i)];
@@ -234,9 +246,9 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
         }
     }
 
-    if(dinfo.jpeg_color_space == JCS_GRAYSCALE && !scale && !yCbCr421) {
+    if(dinfo.jpeg_color_space == JCS_GRAYSCALE && !scale && !forceRGBA) {
         free(rows);
-    } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !yCbCr421) {
+    } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !forceRGBA) {
         free(y_rows);
         free(cb_rows);
         free(cr_rows);
