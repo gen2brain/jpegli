@@ -11,11 +11,11 @@ jobs:
     env:
       CGO_ENABLED: 0
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
     - name: Install Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
-    - name: Checkout code
-      uses: actions/checkout@v4
     - name: Test
       run: go test
