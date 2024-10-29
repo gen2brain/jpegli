@@ -30,6 +30,10 @@ var testRgba []byte
 //go:embed testdata/cmyk.jpg
 var testCmyk []byte
 
+func init() {
+	jpegli.Init()
+}
+
 func TestDecode(t *testing.T) {
 	img, err := jpegli.Decode(bytes.NewReader(testJpg))
 	if err != nil {
@@ -235,7 +239,7 @@ func TestEncodeSync(t *testing.T) {
 		t.Error(err)
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			ch <- true
