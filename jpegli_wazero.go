@@ -13,7 +13,6 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
@@ -33,6 +32,19 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	var cfg image.Config
 	var data []byte
 
+	ctx := context.Background()
+
+	mod, err := rt.InstantiateModule(ctx, cm, mc)
+	if err != nil {
+		return nil, cfg, err
+	}
+
+	defer mod.Close(ctx)
+
+	_alloc := mod.ExportedFunction("malloc")
+	_free := mod.ExportedFunction("free")
+	_decode := mod.ExportedFunction("decode")
+
 	if configOnly {
 		data = make([]byte, 1024)
 		_, err = r.Read(data)
@@ -47,7 +59,6 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	}
 
 	inSize := len(data)
-	ctx := context.Background()
 
 	res, err := _alloc.Call(ctx, uint64(inSize))
 	if err != nil {
@@ -210,6 +221,18 @@ func encode(w io.Writer, m image.Image, quality, chromaSubsampling, progressiveL
 	var colorspace int
 	var chroma int
 
+	ctx := context.Background()
+	mod, err := rt.InstantiateModule(ctx, cm, mc)
+	if err != nil {
+		return err
+	}
+
+	defer mod.Close(ctx)
+
+	_alloc := mod.ExportedFunction("malloc")
+	_free := mod.ExportedFunction("free")
+	_encode := mod.ExportedFunction("encode")
+
 	switch img := m.(type) {
 	case *image.Gray:
 		data = img.Pix
@@ -240,8 +263,6 @@ func encode(w io.Writer, m image.Image, quality, chromaSubsampling, progressiveL
 		data = i.Pix
 		colorspace = jcsRGB
 	}
-
-	ctx := context.Background()
 
 	res, err := _alloc.Call(ctx, uint64(len(data)))
 	if err != nil {
@@ -312,17 +333,14 @@ func encode(w io.Writer, m image.Image, quality, chromaSubsampling, progressiveL
 }
 
 var (
-	mod api.Module
-
-	_alloc  api.Function
-	_free   api.Function
-	_decode api.Function
-	_encode api.Function
+	rt wazero.Runtime
+	cm wazero.CompiledModule
+	mc wazero.ModuleConfig
 )
 
 func init() {
 	ctx := context.Background()
-	rt := wazero.NewRuntime(ctx)
+	rt = wazero.NewRuntime(ctx)
 
 	r, err := gzip.NewReader(bytes.NewReader(jpegliWasm))
 	if err != nil {
@@ -336,20 +354,11 @@ func init() {
 		panic(err)
 	}
 
-	compiled, err := rt.CompileModule(ctx, data.Bytes())
+	cm, err = rt.CompileModule(ctx, data.Bytes())
 	if err != nil {
 		panic(err)
 	}
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
-
-	mod, err = rt.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithStderr(os.Stderr).WithStdout(os.Stdout))
-	if err != nil {
-		panic(err)
-	}
-
-	_alloc = mod.ExportedFunction("malloc")
-	_free = mod.ExportedFunction("free")
-	_decode = mod.ExportedFunction("decode")
-	_encode = mod.ExportedFunction("encode")
+	mc = wazero.NewModuleConfig().WithStderr(os.Stderr).WithStdout(os.Stdout)
 }

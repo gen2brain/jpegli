@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"io"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/gen2brain/jpegli"
@@ -223,6 +224,31 @@ func TestEncodeCMYK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestEncodeSync(t *testing.T) {
+	wg := sync.WaitGroup{}
+	ch := make(chan bool, 2)
+
+	img, err := jpeg.Decode(bytes.NewReader(testJpg))
+	if err != nil {
+		t.Error(err)
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			ch <- true
+			defer func() { <-ch; wg.Done() }()
+
+			err = jpegli.Encode(io.Discard, img, nil)
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+
+	wg.Wait()
 }
 
 func BenchmarkDecodeStd(b *testing.B) {
