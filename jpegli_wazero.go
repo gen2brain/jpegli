@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"sync"
-	"unsafe"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -134,7 +133,7 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	cfg.Width = int(width)
 	cfg.Height = int(height)
 
-	var w, cw int
+	var w, h, cw, ch int
 	var size, i0, i1, i2 int
 
 	switch colorspace {
@@ -146,11 +145,10 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 		size = cfg.Width * cfg.Height * 4
 	case jcsYCbCr:
 		cfg.ColorModel = color.YCbCrModel
-		w, _, cw, _ = yCbCrSize(image.Rect(0, 0, cfg.Width, cfg.Height), image.YCbCrSubsampleRatio(chroma))
-		aw, ah, acw, ach := yCbCrSize(image.Rect(0, 0, alignm(cfg.Width), alignm(cfg.Height)), image.YCbCrSubsampleRatio(chroma))
-		i0 = aw*ah + 0*acw*ach
-		i1 = aw*ah + 1*acw*ach
-		i2 = aw*ah + 2*acw*ach
+		w, h, cw, ch = yCbCrSize(image.Rect(0, 0, alignm(cfg.Width), alignm(cfg.Height)), image.YCbCrSubsampleRatio(chroma))
+		i0 = w*h + 0*cw*ch
+		i1 = w*h + 1*cw*ch
+		i2 = w*h + 2*cw*ch
 		size = i2
 	case jcsCMYK, jcsYCCK:
 		cfg.ColorModel = color.CMYKModel
@@ -253,16 +251,16 @@ func encode(w io.Writer, m image.Image, quality, chromaSubsampling, progressiveL
 	case *image.CMYK:
 		data = img.Pix
 		colorspace = jcsCMYK
-	case *image.YCbCr:
-		length := len(img.Y) + len(img.Cb) + len(img.Cr)
-		var b = struct {
-			addr *uint8
-			len  int
-			cap  int
-		}{&img.Y[0], length, length}
-		data = *(*[]byte)(unsafe.Pointer(&b))
-		colorspace = jcsYCbCr
-		chroma = int(img.SubsampleRatio)
+	//case *image.YCbCr:
+	//	length := len(img.Y) + len(img.Cb) + len(img.Cr)
+	//	var b = struct {
+	//		addr *uint8
+	//		len  int
+	//		cap  int
+	//	}{&img.Y[0], length, length}
+	//	data = *(*[]byte)(unsafe.Pointer(&b))
+	//	colorspace = jcsYCbCr
+	//	chroma = int(img.SubsampleRatio)
 	default:
 		i := imageToRGBA(img)
 		data = i.Pix

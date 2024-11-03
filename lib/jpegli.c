@@ -6,7 +6,7 @@
 #include "jpegli/encode.h"
 
 #define ALIGN_SIZE 16
-#define ALIGNM(x)  ((((x) + ((ALIGN_SIZE) - 1)) / (ALIGN_SIZE)) * (ALIGN_SIZE))
+#define ALIGNM(x) ((x + ALIGN_SIZE - 1) & (~(ALIGN_SIZE - 1)))
 
 int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width, uint32_t *height, uint32_t *colorspace, uint32_t *chroma, uint8_t *out,
         int fancy_upsampling, int block_smoothing, int arith_code, int dct_method, int tw, int th);
@@ -301,7 +301,9 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
         case JCS_GRAYSCALE:
             cinfo.input_components = 1;
             cinfo.in_color_space = JCS_GRAYSCALE;
+
             jpegli_set_defaults(&cinfo);
+            jpegli_set_colorspace(&cinfo, JCS_GRAYSCALE);
 
             cinfo.raw_data_in = 1;
             cinfo.comp_info[0].h_samp_factor = 1, cinfo.comp_info[0].v_samp_factor = 1;
@@ -309,9 +311,12 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
         case JCS_YCbCr:
             cinfo.input_components = 3;
             cinfo.in_color_space = JCS_YCbCr;
+
             jpegli_set_defaults(&cinfo);
-        
+            jpegli_set_colorspace(&cinfo, JCS_YCbCr);
+
             cinfo.raw_data_in = 1;
+
             switch(chroma) {
                 case YCbCr444:
                     cinfo.comp_info[Y].h_samp_factor = 1, cinfo.comp_info[Y].v_samp_factor = 1;
@@ -338,7 +343,9 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
         case JCS_RGB:
             cinfo.input_components = 4;
             cinfo.in_color_space = JCS_EXT_RGBA;
+
             jpegli_set_defaults(&cinfo);
+            jpegli_set_colorspace(&cinfo, JCS_YCbCr);
 
             switch(chroma) {
                 case YCbCr444:
@@ -366,7 +373,9 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
         case JCS_CMYK:
             cinfo.input_components = 4;
             cinfo.in_color_space = JCS_CMYK;
+
             jpegli_set_defaults(&cinfo);
+            jpegli_set_colorspace(&cinfo, JCS_CMYK);
             break;
         default:
             jpegli_destroy_compress(&cinfo);
@@ -402,28 +411,23 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
         cb_rows = malloc(sizeof(JSAMPROW) * c_h);
         cr_rows = malloc(sizeof(JSAMPROW) * c_h);
 
+        w = ALIGNM(width);
+        h = ALIGNM(height);
+
         switch(chroma) {
             case YCbCr444:
-                w = ALIGNM(cinfo.comp_info[Y].downsampled_width);
-                h = ALIGNM(cinfo.comp_info[Y].downsampled_height);
                 cw = w;
                 ch = h;
                 break;
             case YCbCr440:
-                w = ALIGNM(cinfo.comp_info[Y].downsampled_width);
-                h = ALIGNM(cinfo.comp_info[Y].downsampled_height);
                 cw = w;
                 ch = (h+1)/2;
                 break;
             case YCbCr422:
-                w = ALIGNM(cinfo.comp_info[Y].downsampled_width);
-                h = ALIGNM(cinfo.comp_info[Y].downsampled_height);
                 cw = (w+1)/2;
                 ch = h;
                 break;
             case YCbCr420:
-                w = ALIGNM(cinfo.comp_info[Y].downsampled_width);
-                h = ALIGNM(cinfo.comp_info[Y].downsampled_height);
                 cw = (w+1)/2;
                 ch = (h+1)/2;
                 break;
