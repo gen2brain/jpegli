@@ -368,9 +368,10 @@ func initialize() {
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
 
-	mc = wazero.NewModuleConfig().WithStderr(os.Stderr).WithStdout(os.Stdout)
 	if runtime.GOOS == "windows" && isWindowsGUI() {
-		mc = wazero.NewModuleConfig()
+		mc = wazero.NewModuleConfig().WithStderr(io.Discard).WithStdout(io.Discard)
+	} else {
+		mc = wazero.NewModuleConfig().WithStderr(os.Stderr).WithStdout(os.Stdout)
 	}
 }
 
