@@ -215,6 +215,75 @@ func alignm(a int) int {
 	return (a + (alignSize - 1)) & (^(alignSize - 1))
 }
 
+// packYCbCr packs an image.YCbCr into the contiguous MCU-aligned Y/Cb/Cr
+// planes the raw_data_in encoder expects, edge-replicating the padding.
+func packYCbCr(img *image.YCbCr) []byte {
+	width := img.Rect.Dx()
+	height := img.Rect.Dy()
+
+	w := alignm(width)
+	h := alignm(height)
+
+	_, _, scw, sch := yCbCrSize(img.Rect, img.SubsampleRatio)
+
+	var cw, ch int
+	switch img.SubsampleRatio {
+	case image.YCbCrSubsampleRatio422:
+		cw, ch = (w+1)/2, h
+	case image.YCbCrSubsampleRatio420:
+		cw, ch = (w+1)/2, (h+1)/2
+	case image.YCbCrSubsampleRatio440:
+		cw, ch = w, (h+1)/2
+	default:
+		cw, ch = w, h
+	}
+
+	i0 := w * h
+	i1 := i0 + cw*ch
+	i2 := i1 + cw*ch
+	data := make([]byte, i2)
+
+	for dy := 0; dy < h; dy++ {
+		sy := dy
+		if sy >= height {
+			sy = height - 1
+		}
+		yo := img.YOffset(img.Rect.Min.X, img.Rect.Min.Y+sy)
+		row := data[dy*w : dy*w+w]
+		copy(row, img.Y[yo:yo+width])
+		padEdge(row, width)
+	}
+
+	cbase := img.COffset(img.Rect.Min.X, img.Rect.Min.Y)
+
+	for dc := 0; dc < ch; dc++ {
+		sc := dc
+		if sc >= sch {
+			sc = sch - 1
+		}
+		so := cbase + sc*img.CStride
+		cb := data[i0+dc*cw : i0+dc*cw+cw]
+		cr := data[i1+dc*cw : i1+dc*cw+cw]
+		copy(cb, img.Cb[so:so+scw])
+		copy(cr, img.Cr[so:so+scw])
+		padEdge(cb, scw)
+		padEdge(cr, scw)
+	}
+
+	return data
+}
+
+func padEdge(row []byte, valid int) {
+	if valid <= 0 || valid >= len(row) {
+		return
+	}
+
+	last := row[valid-1]
+	for i := valid; i < len(row); i++ {
+		row[i] = last
+	}
+}
+
 func init() {
 	image.RegisterFormat("jpeg", "\xff\xd8", Decode, DecodeConfig)
 }

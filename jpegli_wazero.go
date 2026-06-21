@@ -253,16 +253,18 @@ func encode(w io.Writer, m image.Image, quality, chromaSubsampling, progressiveL
 	case *image.CMYK:
 		data = img.Pix
 		colorspace = jcsCMYK
-	//case *image.YCbCr:
-	//	length := len(img.Y) + len(img.Cb) + len(img.Cr)
-	//	var b = struct {
-	//		addr *uint8
-	//		len  int
-	//		cap  int
-	//	}{&img.Y[0], length, length}
-	//	data = *(*[]byte)(unsafe.Pointer(&b))
-	//	colorspace = jcsYCbCr
-	//	chroma = int(img.SubsampleRatio)
+	case *image.YCbCr:
+		switch img.SubsampleRatio {
+		case image.YCbCrSubsampleRatio444, image.YCbCrSubsampleRatio422,
+			image.YCbCrSubsampleRatio420, image.YCbCrSubsampleRatio440:
+			data = packYCbCr(img)
+			colorspace = jcsYCbCr
+			chroma = int(img.SubsampleRatio)
+		default:
+			i := imageToRGBA(img)
+			data = i.Pix
+			colorspace = jcsRGB
+		}
 	default:
 		i := imageToRGBA(img)
 		data = i.Pix

@@ -230,6 +230,130 @@ func TestEncodeCMYK(t *testing.T) {
 	}
 }
 
+func makeYCbCr(w, h int, ratio image.YCbCrSubsampleRatio) *image.YCbCr {
+	img := image.NewYCbCr(image.Rect(0, 0, w, h), ratio)
+
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Y[img.YOffset(x, y)] = uint8((x*7 + y*5) & 0xff)
+		}
+	}
+
+	for i := range img.Cb {
+		img.Cb[i] = uint8((i*3 + 40) & 0xff)
+		img.Cr[i] = uint8((i*11 + 90) & 0xff)
+	}
+
+	return img
+}
+
+func stridedYCbCr(src *image.YCbCr) *image.YCbCr {
+	w, h := src.Rect.Dx(), src.Rect.Dy()
+	sch := len(src.Cb) / src.CStride
+	scw := src.CStride
+
+	dst := &image.YCbCr{
+		YStride:        src.YStride + 13,
+		CStride:        src.CStride + 5,
+		SubsampleRatio: src.SubsampleRatio,
+		Rect:           src.Rect,
+	}
+	dst.Y = make([]byte, dst.YStride*h)
+	dst.Cb = make([]byte, dst.CStride*sch)
+	dst.Cr = make([]byte, dst.CStride*sch)
+
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			dst.Y[dst.YOffset(x, y)] = src.Y[src.YOffset(x, y)]
+		}
+	}
+
+	for cy := 0; cy < sch; cy++ {
+		for cx := 0; cx < scw; cx++ {
+			dst.Cb[cy*dst.CStride+cx] = src.Cb[cy*src.CStride+cx]
+			dst.Cr[cy*dst.CStride+cx] = src.Cr[cy*src.CStride+cx]
+		}
+	}
+
+	return dst
+}
+
+func TestEncodeYCbCrRoundtrip(t *testing.T) {
+	ratios := []image.YCbCrSubsampleRatio{
+		image.YCbCrSubsampleRatio444,
+		image.YCbCrSubsampleRatio422,
+		image.YCbCrSubsampleRatio420,
+		image.YCbCrSubsampleRatio440,
+	}
+
+	for _, ratio := range ratios {
+		ratio := ratio
+		t.Run(ratio.String(), func(t *testing.T) {
+			src := makeYCbCr(17, 19, ratio)
+
+			var buf bytes.Buffer
+			err := jpegli.Encode(&buf, src, &jpegli.EncodingOptions{Quality: 95, ChromaSubsampling: ratio})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			out, err := jpeg.Decode(&buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if out.Bounds() != src.Bounds() {
+				t.Fatalf("bounds: got %v, want %v", out.Bounds(), src.Bounds())
+			}
+
+			dec := out.(*image.YCbCr)
+			var sum, n int
+			for y := 0; y < 19; y++ {
+				for x := 0; x < 17; x++ {
+					d := int(dec.Y[dec.YOffset(x, y)]) - int(src.Y[src.YOffset(x, y)])
+					if d < 0 {
+						d = -d
+					}
+					sum += d
+					n++
+				}
+			}
+			if mean := float64(sum) / float64(n); mean > 12 {
+				t.Errorf("mean Y diff too high: %.2f", mean)
+			}
+		})
+	}
+}
+
+func TestEncodeYCbCrStrided(t *testing.T) {
+	ratios := []image.YCbCrSubsampleRatio{
+		image.YCbCrSubsampleRatio444,
+		image.YCbCrSubsampleRatio422,
+		image.YCbCrSubsampleRatio420,
+		image.YCbCrSubsampleRatio440,
+	}
+
+	for _, ratio := range ratios {
+		ratio := ratio
+		t.Run(ratio.String(), func(t *testing.T) {
+			src := makeYCbCr(23, 21, ratio)
+			strided := stridedYCbCr(src)
+
+			var a, b bytes.Buffer
+			if err := jpegli.Encode(&a, src, &jpegli.EncodingOptions{Quality: 90, ChromaSubsampling: ratio}); err != nil {
+				t.Fatal(err)
+			}
+			if err := jpegli.Encode(&b, strided, &jpegli.EncodingOptions{Quality: 90, ChromaSubsampling: ratio}); err != nil {
+				t.Fatal(err)
+			}
+
+			if !bytes.Equal(a.Bytes(), b.Bytes()) {
+				t.Errorf("strided encode differs from contiguous: %d vs %d bytes", a.Len(), b.Len())
+			}
+		})
+	}
+}
+
 func TestEncodeSync(t *testing.T) {
 	wg := sync.WaitGroup{}
 	ch := make(chan bool, 2)
