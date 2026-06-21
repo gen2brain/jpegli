@@ -49,6 +49,7 @@ $(BIN): $(JPEGLI_BUILD)/lib/libjpegli-static.a
 		-Wl,--export=free \
 		-Wl,--export=decode \
 		-Wl,--export=encode \
+		-Wl,--strip-debug \
 		-mexec-model=reactor \
 		-fno-exceptions \
 		-mnontrapping-fptoint \
