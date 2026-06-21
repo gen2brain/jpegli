@@ -8,11 +8,21 @@
 #define ALIGN_SIZE 16
 #define ALIGNM(x) ((x + ALIGN_SIZE - 1) & (~(ALIGN_SIZE - 1)))
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width, uint32_t *height, uint32_t *colorspace, uint32_t *chroma, uint8_t *out,
         int fancy_upsampling, int block_smoothing, int arith_code, int dct_method, int tw, int th);
 
 uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, size_t *size, int quality, int progressive_level, int optimize_coding,
         int adaptive_quantization, int standard_quant_tables, int fancy_downsampling, int dct_method);
+
+void error_exit(j_common_ptr info);
+
+#ifdef __cplusplus
+}
+#endif
 
 typedef enum {
     Y,
@@ -91,7 +101,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
 
             dinfo.raw_data_out = 1;
             break;
-        case JCS_YCbCr:
+        case JCS_YCbCr: {
             if(scale) {
                 break;
             }
@@ -154,6 +164,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
             }
 
             break;
+        }
         case JCS_RGB:
             dinfo.out_color_space = JCS_EXT_RGBA;
             break;
@@ -178,7 +189,7 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
         return 1;
     }
 
-    dinfo.dct_method = dct_method;
+    dinfo.dct_method = (J_DCT_METHOD)dct_method;
     dinfo.do_fancy_upsampling = fancy_upsampling;
     dinfo.do_block_smoothing = block_smoothing;
     dinfo.arith_code = arith_code;
@@ -206,11 +217,11 @@ int decode(uint8_t *jpeg_in, int jpeg_in_size, int config_only, uint32_t *width,
     stride = dinfo.output_width * dinfo.out_color_components;
     
     if(dinfo.jpeg_color_space == JCS_GRAYSCALE && !scale && !forceRGBA) {
-        rows = malloc(sizeof(JSAMPROW) * mcu_rows);
+        rows = (JSAMPROW *)malloc(sizeof(JSAMPROW) * mcu_rows);
     } else if(dinfo.jpeg_color_space == JCS_YCbCr && !scale && !forceRGBA) {
-        y_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
-        cb_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
-        cr_rows = malloc(sizeof(JSAMPROW) * mcu_rows);
+        y_rows = (JSAMPROW *)malloc(sizeof(JSAMPROW) * mcu_rows);
+        cb_rows = (JSAMPROW *)malloc(sizeof(JSAMPROW) * mcu_rows);
+        cr_rows = (JSAMPROW *)malloc(sizeof(JSAMPROW) * mcu_rows);
 
         y_stride = w;
         c_stride = cw;
@@ -392,7 +403,7 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
         cinfo.optimize_coding = 1;
     }
 
-    cinfo.dct_method = dct_method;
+    cinfo.dct_method = (J_DCT_METHOD)dct_method;
     cinfo.do_fancy_downsampling = fancy_downsampling;
 
     uint8_t* out = NULL;
@@ -402,14 +413,14 @@ uint8_t* encode(uint8_t *in, int width, int height, int colorspace, int chroma, 
 
     if(colorspace == JCS_GRAYSCALE) {
         h = DCTSIZE * cinfo.comp_info[0].v_samp_factor;
-        rows = malloc(sizeof(JSAMPROW) * h);
+        rows = (JSAMPROW *)malloc(sizeof(JSAMPROW) * h);
     } else if(colorspace == JCS_YCbCr) {
         y_h = DCTSIZE * cinfo.comp_info[Y].v_samp_factor;
         c_h = DCTSIZE * cinfo.comp_info[Cb].v_samp_factor;
 
-        y_rows = malloc(sizeof(JSAMPROW) * y_h);
-        cb_rows = malloc(sizeof(JSAMPROW) * c_h);
-        cr_rows = malloc(sizeof(JSAMPROW) * c_h);
+        y_rows = (JSAMPROW *)malloc(sizeof(JSAMPROW) * y_h);
+        cb_rows = (JSAMPROW *)malloc(sizeof(JSAMPROW) * c_h);
+        cr_rows = (JSAMPROW *)malloc(sizeof(JSAMPROW) * c_h);
 
         w = ALIGNM(width);
         h = ALIGNM(height);
