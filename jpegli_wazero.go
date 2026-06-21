@@ -50,8 +50,7 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	_decode := mod.ExportedFunction("decode")
 
 	if configOnly {
-		data = make([]byte, 1024)
-		_, err = r.Read(data)
+		data, err = io.ReadAll(io.LimitReader(r, 1024))
 		if err != nil {
 			return nil, cfg, fmt.Errorf("read: %w", err)
 		}
