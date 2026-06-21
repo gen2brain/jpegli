@@ -1,3 +1,5 @@
+//go:build amd64
+
 package jpegli
 
 import (
@@ -345,6 +347,11 @@ var (
 
 	initOnce = sync.OnceFunc(initialize)
 )
+
+// Init eagerly compiles the wazero module; otherwise the first Decode/Encode does. Optional.
+func Init() {
+	initOnce()
+}
 
 func initialize() {
 	ctx := context.Background()

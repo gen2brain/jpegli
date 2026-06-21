@@ -1,6 +1,8 @@
 // Package jpegli implements an JPEG image encoder/decoder based on jpegli compiled to WASM.
 package jpegli
 
+//go:generate make -C lib wasm2go
+
 import (
 	"errors"
 	"image"
@@ -164,12 +166,6 @@ func Encode(w io.Writer, m image.Image, o ...*EncodingOptions) error {
 	}
 
 	return nil
-}
-
-// Init initializes wazero runtime and compiles the module.
-// There is no need to explicitly call this function, first Decode/Encode will initialize the runtime.
-func Init() {
-	initOnce()
 }
 
 func imageToRGBA(src image.Image) *image.RGBA {
