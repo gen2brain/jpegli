@@ -6,6 +6,12 @@ Go encoder/decoder for [JPEG](https://en.wikipedia.org/wiki/JPEG).
 
 Based on [jpegli](https://github.com/google/jpegli) from libjxl compiled to [WASM](https://en.wikipedia.org/wiki/WebAssembly) and used with [wazero](https://wazero.io/) runtime (CGo-free).
 
+### Build tags
+
+* `wasm2go` - transpile the WASM to pure Go with [wasm2go](https://github.com/ncruces/wasm2go) instead of running it with wazero
+
+On `arm64` the `wasm2go` backend is always used.
+
 ### Resources
 
 * https://giannirosato.com/blog/post/jpegli/

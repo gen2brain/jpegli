@@ -1,4 +1,4 @@
-//go:build !amd64
+//go:build wasm2go || arm64
 
 package jpegli
 
@@ -291,14 +291,14 @@ func encode(w io.Writer, m image.Image, quality, chromaSubsampling, progressiveL
 // Init is a no-op; the wasm2go backend builds a fresh module per call.
 func Init() {}
 
-func newModule() *Module {
-	mod := New(&wasiHost{})
+func newModule() *module {
+	mod := newModuleRaw(&wasiHost{})
 	mod.X_initialize()
 
 	return mod
 }
 
-func (m *Module) write(ptr int32, data []byte) bool {
+func (m *module) write(ptr int32, data []byte) bool {
 	if ptr < 0 || int(ptr)+len(data) > len(m.memory) {
 		return false
 	}
@@ -308,7 +308,7 @@ func (m *Module) write(ptr int32, data []byte) bool {
 	return true
 }
 
-func (m *Module) read(ptr, size int32) ([]byte, bool) {
+func (m *module) read(ptr, size int32) ([]byte, bool) {
 	if ptr < 0 || size < 0 || int(ptr)+int(size) > len(m.memory) {
 		return nil, false
 	}
@@ -316,7 +316,7 @@ func (m *Module) read(ptr, size int32) ([]byte, bool) {
 	return m.memory[ptr : ptr+size : ptr+size], true
 }
 
-func (m *Module) readUint32(ptr int32) (uint32, bool) {
+func (m *module) readUint32(ptr int32) (uint32, bool) {
 	if ptr < 0 || int(ptr)+4 > len(m.memory) {
 		return 0, false
 	}
@@ -324,7 +324,7 @@ func (m *Module) readUint32(ptr int32) (uint32, bool) {
 	return load32(m.memory[ptr:]), true
 }
 
-func (m *Module) readUint64(ptr int32) (uint64, bool) {
+func (m *module) readUint64(ptr int32) (uint64, bool) {
 	if ptr < 0 || int(ptr)+8 > len(m.memory) {
 		return 0, false
 	}
@@ -342,13 +342,13 @@ type procExit struct {
 // module needs: jpegli only emits diagnostic messages (fd_write) and may abort
 // on a fatal error (proc_exit); the remaining calls are stubs.
 type wasiHost struct {
-	mod *Module
+	mod *module
 }
 
-// Init is called by the generated New with the freshly created module so the
+// Init is called by the generated newModuleRaw with the freshly created module so the
 // host can reach its linear memory.
 func (h *wasiHost) Init(m any) {
-	h.mod = m.(*Module)
+	h.mod = m.(*module)
 }
 
 func (h *wasiHost) Xfd_close(fd int32) int32 {

@@ -1,4 +1,4 @@
-//go:build amd64
+//go:build !wasm2go && !arm64
 
 package jpegli
 
