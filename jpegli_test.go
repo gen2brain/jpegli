@@ -2,13 +2,17 @@ package jpegli_test
 
 import (
 	"bytes"
-	_ "embed"
+	"embed"
+	"encoding/binary"
+	"errors"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"image/png"
 	"io"
 	"os"
+	"path"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -502,4 +506,92 @@ func writeCloser(s ...string) (io.WriteCloser, error) {
 	}
 
 	return discardCloser, nil
+}
+
+//go:embed testdata/*.jpg
+var fuzzCorpus embed.FS
+
+// patchSOF encodes a small grayscale JPEG and rewrites its SOF0 dimensions.
+func patchSOF(t *testing.T, w, h uint16) []byte {
+	t.Helper()
+
+	img := image.NewGray(image.Rect(0, 0, 8, 8))
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 50}); err != nil {
+		t.Fatal(err)
+	}
+
+	b := buf.Bytes()
+	for i := 0; i+9 < len(b); i++ {
+		if b[i] == 0xFF && b[i+1] == 0xC0 {
+			binary.BigEndian.PutUint16(b[i+5:], h)
+			binary.BigEndian.PutUint16(b[i+7:], w)
+			return b
+		}
+	}
+
+	t.Fatal("SOF0 not found")
+	return nil
+}
+
+func TestDecodeBomb(t *testing.T) {
+	bomb := patchSOF(t, 32000, 32000)
+
+	var m0, m1 runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&m0)
+
+	_, err := jpegli.Decode(bytes.NewReader(bomb))
+	if !errors.Is(err, jpegli.ErrTooLarge) {
+		t.Fatalf("got err %v, want ErrTooLarge", err)
+	}
+
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+
+	if grew := (m1.TotalAlloc - m0.TotalAlloc) / (1024 * 1024); grew > 64 {
+		t.Errorf("allocated %d MiB for rejected bomb", grew)
+	}
+}
+
+func TestDecodeBombConfig(t *testing.T) {
+	bomb := patchSOF(t, 60000, 60000)
+
+	_, err := jpegli.DecodeConfig(bytes.NewReader(bomb))
+	if !errors.Is(err, jpegli.ErrTooLarge) {
+		t.Fatalf("got err %v, want ErrTooLarge", err)
+	}
+}
+
+func addCorpus(f *testing.F) {
+	f.Helper()
+
+	files, err := fuzzCorpus.ReadDir("testdata")
+	if err != nil {
+		f.Fatal(err)
+	}
+
+	for _, file := range files {
+		data, err := fuzzCorpus.ReadFile(path.Join("testdata", file.Name()))
+		if err != nil {
+			f.Fatal(err)
+		}
+		f.Add(data)
+	}
+}
+
+func FuzzDecode(f *testing.F) {
+	addCorpus(f)
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, _ = jpegli.Decode(bytes.NewReader(data))
+	})
+}
+
+func FuzzDecodeConfig(f *testing.F) {
+	addCorpus(f)
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, _ = jpegli.DecodeConfig(bytes.NewReader(data))
+	})
 }

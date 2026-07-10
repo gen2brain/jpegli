@@ -69,6 +69,9 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	if err != nil {
 		return nil, cfg, fmt.Errorf("alloc: %w", err)
 	}
+	if res[0] == 0 {
+		return nil, cfg, ErrMemAlloc
+	}
 	inPtr := res[0]
 	defer _free.Call(ctx, inPtr)
 
@@ -80,6 +83,9 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	res, err = _alloc.Call(ctx, 4*4)
 	if err != nil {
 		return nil, cfg, fmt.Errorf("alloc: %w", err)
+	}
+	if res[0] == 0 {
+		return nil, cfg, ErrMemAlloc
 	}
 	defer _free.Call(ctx, res[0])
 
@@ -136,6 +142,10 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	cfg.Width = int(width)
 	cfg.Height = int(height)
 
+	if err = checkDimensions(cfg.Width, cfg.Height, inSize, configOnly); err != nil {
+		return nil, cfg, err
+	}
+
 	var w, h, cw, ch int
 	var size, i0, i1, i2 int
 
@@ -167,6 +177,9 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	res, err = _alloc.Call(ctx, uint64(size))
 	if err != nil {
 		return nil, cfg, fmt.Errorf("alloc: %w", err)
+	}
+	if res[0] == 0 {
+		return nil, cfg, ErrMemAlloc
 	}
 	outPtr := res[0]
 	defer _free.Call(ctx, outPtr)

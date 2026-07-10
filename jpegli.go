@@ -14,9 +14,14 @@ import (
 var (
 	ErrMemRead  = errors.New("jpegli: mem read failed")
 	ErrMemWrite = errors.New("jpegli: mem write failed")
+	ErrMemAlloc = errors.New("jpegli: mem alloc failed")
 	ErrDecode   = errors.New("jpegli: decode failed")
 	ErrEncode   = errors.New("jpegli: encode failed")
+	ErrTooLarge = errors.New("jpegli: image dimensions exceed limit")
 )
+
+// maxPixels caps decoded image dimensions.
+const maxPixels = 1 << 28
 
 // DefaultQuality is the default quality encoding parameter.
 const DefaultQuality = 75
@@ -209,6 +214,25 @@ func yCbCrSize(r image.Rectangle, subsampleRatio image.YCbCrSubsampleRatio) (w, 
 
 func alignm(a int) int {
 	return (a + (alignSize - 1)) & (^(alignSize - 1))
+}
+
+// checkDimensions validates decoded dimensions against maxPixels and input size.
+func checkDimensions(width, height, inSize int, configOnly bool) error {
+	if width <= 0 || height <= 0 {
+		return ErrDecode
+	}
+
+	pixels := int64(width) * int64(height)
+
+	if pixels > maxPixels {
+		return ErrTooLarge
+	}
+
+	if !configOnly && pixels > int64(inSize)*1024 {
+		return ErrTooLarge
+	}
+
+	return nil
 }
 
 // packYCbCr packs an image.YCbCr into the contiguous MCU-aligned Y/Cb/Cr

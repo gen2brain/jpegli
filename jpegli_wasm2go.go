@@ -48,6 +48,9 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	inSize := len(data)
 
 	inPtr := mod.Xmalloc(int32(inSize))
+	if inPtr == 0 {
+		return nil, cfg, ErrMemAlloc
+	}
 	defer mod.Xfree(inPtr)
 
 	ok := mod.write(inPtr, data)
@@ -56,6 +59,9 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	}
 
 	ptr := mod.Xmalloc(4 * 4)
+	if ptr == 0 {
+		return nil, cfg, ErrMemAlloc
+	}
 	defer mod.Xfree(ptr)
 
 	widthPtr := ptr
@@ -107,6 +113,10 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	cfg.Width = int(width)
 	cfg.Height = int(height)
 
+	if err = checkDimensions(cfg.Width, cfg.Height, inSize, configOnly); err != nil {
+		return nil, cfg, err
+	}
+
 	var w, h, cw, ch int
 	var size, i0, i1, i2 int
 
@@ -136,6 +146,9 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 	}
 
 	outPtr := mod.Xmalloc(int32(size))
+	if outPtr == 0 {
+		return nil, cfg, ErrMemAlloc
+	}
 	defer mod.Xfree(outPtr)
 
 	res = mod.Xdecode(inPtr, int32(inSize), 0, widthPtr, heightPtr, colorspacePtr, chromaPtr, outPtr,
