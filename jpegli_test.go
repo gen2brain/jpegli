@@ -508,6 +508,23 @@ func writeCloser(s ...string) (io.WriteCloser, error) {
 	return discardCloser, nil
 }
 
+func TestDecodeNoAlias(t *testing.T) {
+	img, err := jpegli.Decode(bytes.NewReader(testGray))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g, ok := img.(*image.Gray)
+	if !ok {
+		t.Fatalf("got %T, want *image.Gray", img)
+	}
+
+	want := g.Rect.Dx() * g.Rect.Dy()
+	if len(g.Pix) != want || cap(g.Pix) != want {
+		t.Errorf("Pix len=%d cap=%d, want %d (image aliases WASM memory)", len(g.Pix), cap(g.Pix), want)
+	}
+}
+
 //go:embed testdata/*.jpg
 var fuzzCorpus embed.FS
 

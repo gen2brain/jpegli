@@ -4,7 +4,9 @@ package jpegli
 //go:generate make -C lib wasm2go
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/draw"
 	"io"
@@ -214,6 +216,37 @@ func yCbCrSize(r image.Rectangle, subsampleRatio image.YCbCrSubsampleRatio) (w, 
 
 func alignm(a int) int {
 	return (a + (alignSize - 1)) & (^(alignSize - 1))
+}
+
+// buildImage copies out of the module memory view into a caller-owned image.
+func buildImage(colorspace, chroma uint32, out []byte, cfg image.Config, w, cw, i0, i1, i2 int) (image.Image, error) {
+	switch colorspace {
+	case jcsGrayscale:
+		i := image.NewGray(image.Rect(0, 0, cfg.Width, cfg.Height))
+		copy(i.Pix, out)
+		return i, nil
+	case jcsRGB:
+		i := image.NewRGBA(image.Rect(0, 0, cfg.Width, cfg.Height))
+		copy(i.Pix, out)
+		return i, nil
+	case jcsYCbCr:
+		buf := bytes.Clone(out)
+		return &image.YCbCr{
+			Y:              buf[:i0:i0],
+			Cb:             buf[i0:i1:i1],
+			Cr:             buf[i1:i2:i2],
+			SubsampleRatio: image.YCbCrSubsampleRatio(chroma),
+			YStride:        w,
+			CStride:        cw,
+			Rect:           image.Rect(0, 0, cfg.Width, cfg.Height),
+		}, nil
+	case jcsCMYK, jcsYCCK:
+		i := image.NewCMYK(image.Rect(0, 0, cfg.Width, cfg.Height))
+		copy(i.Pix, out)
+		return i, nil
+	default:
+		return nil, fmt.Errorf("unsupported colorspace %d", colorspace)
+	}
 }
 
 // checkDimensions validates decoded dimensions against maxPixels and input size.

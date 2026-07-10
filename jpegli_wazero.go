@@ -199,33 +199,9 @@ func decode(r io.Reader, configOnly, fancyUpsampling, blockSmoothing, arithCode 
 		return nil, cfg, ErrMemRead
 	}
 
-	var img image.Image
-
-	switch colorspace {
-	case jcsGrayscale:
-		i := image.NewGray(image.Rect(0, 0, cfg.Width, cfg.Height))
-		i.Pix = out
-		img = i
-	case jcsRGB:
-		i := image.NewRGBA(image.Rect(0, 0, cfg.Width, cfg.Height))
-		i.Pix = out
-		img = i
-	case jcsYCbCr:
-		img = &image.YCbCr{
-			Y:              out[:i0:i0],
-			Cb:             out[i0:i1:i1],
-			Cr:             out[i1:i2:i2],
-			SubsampleRatio: image.YCbCrSubsampleRatio(chroma),
-			YStride:        w,
-			CStride:        cw,
-			Rect:           image.Rect(0, 0, cfg.Width, cfg.Height),
-		}
-	case jcsCMYK, jcsYCCK:
-		i := image.NewCMYK(image.Rect(0, 0, cfg.Width, cfg.Height))
-		i.Pix = out
-		img = i
-	default:
-		return nil, cfg, fmt.Errorf("unsupported colorspace %d", colorspace)
+	img, err := buildImage(colorspace, chroma, out, cfg, w, cw, i0, i1, i2)
+	if err != nil {
+		return nil, cfg, err
 	}
 
 	return img, cfg, nil
